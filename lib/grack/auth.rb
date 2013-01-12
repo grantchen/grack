@@ -9,29 +9,42 @@ module Grack
       @request = Rack::Request.new(env)
       @auth = Request.new(env)
 
-      if not @auth.provided?
-        unauthorized
-      elsif not @auth.basic?
-        bad_request
-      else
-        result = if (access = valid? and access == true)
-          @env['REMOTE_USER'] = @auth.username
-          @app.call(env)
-        else
-          if access == '404'
-            render_not_found
-          elsif access == '403'
-            render_no_access
-          else
-            unauthorized
-          end
-        end
-        result
+      return unauthorized unless @auth.provided?
+      return bad_request unless @auth.basic?
+
+      case valid?
+      when true
+        @env['REMOTE_USER'] = @auth.username
+        @app.call(env)
+      when '404'
+        return render_not_found
+      when '403'
+        return render_no_access
+      else# aka. false
+        return unauthorized
       end
     end# method call
 
     def valid?
       false
+    end
+
+    PLAIN_TYPE = {"Content-Type" => "text/plain"}
+
+    def render_method_not_allowed
+      if @env['SERVER_PROTOCOL'] == "HTTP/1.1"
+        [405, PLAIN_TYPE, ["Method Not Allowed"]]
+      else
+        [400, PLAIN_TYPE, ["Bad Request"]]
+      end
+    end
+
+    def render_not_found
+      [404, PLAIN_TYPE, ["Not Found"]]
+    end
+
+    def render_no_access
+      [403, PLAIN_TYPE, ["Forbidden"]]
     end
   end# class Auth
 end# module Grack
