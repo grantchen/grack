@@ -3,6 +3,7 @@ require 'rack/request'
 require 'rack/response'
 require 'rack/utils'
 require 'time'
+require 'open3'
 
 module Grack
   class Server
@@ -64,12 +65,18 @@ module Grack
       @res["Content-Type"] = "application/x-git-%s-result" % @rpc
       @res.finish do
         command = git_command("#{@rpc} --stateless-rpc #{@dir}")
-        IO.popen(command, File::RDWR) do |pipe|
-          pipe.write(input)
-          while !pipe.eof?
-            block = pipe.read(8192) # 8M at a time
+
+        Open3.popen3(command) do |stdin, stdout, stderr, wait_thr|
+          pid = wait_thr.pid # pid of the started process.
+
+          stdin.set_encoding input.encoding, input.encoding
+          stdin.write(input)
+          while !stdout.eof?
+            block = stdout.read(8192) # 8M at a time
             @res.write block        # steam it to the client
           end
+
+          exit_status = wait_thr.value # Process::Status object returned.
         end
       end
     end
