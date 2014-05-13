@@ -1,6 +1,4 @@
 require 'rack/builder'
-require 'grack/auth'
-require 'grack/server'
 
 module Grack
   module Bundle
